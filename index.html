@@ -1,0 +1,1501 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>MateGeo 3D – Geometría del Espacio</title>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<style>
+  :root {
+    --navy:   #0D1B2A;
+    --violet: #7B2FBE;
+    --violet-light: #A855F7;
+    --cyan:   #00D4FF;
+    --lime:   #B5FF3A;
+    --white:  #F2F4FF;
+    --card-bg: rgba(255,255,255,0.05);
+    --card-border: rgba(0,212,255,0.2);
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Nunito', sans-serif;
+    background: var(--navy);
+    color: var(--white);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ── CANVAS BG ── */
+  #bg-canvas {
+    position: fixed; inset: 0;
+    pointer-events: none;
+    z-index: 0;
+    opacity: .35;
+  }
+
+  /* ── LAYOUT ── */
+  .page { position: relative; z-index: 1; max-width: 900px; margin: 0 auto; padding: 0 20px 60px; }
+
+  /* ── HERO ── */
+  .hero {
+    text-align: center;
+    padding: 60px 20px 40px;
+  }
+  .hero-badge {
+    display: inline-block;
+    background: linear-gradient(135deg, var(--violet), var(--cyan));
+    color: #fff;
+    font-size: .78rem;
+    font-weight: 800;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    padding: 5px 16px;
+    border-radius: 999px;
+    margin-bottom: 18px;
+  }
+  .hero h1 {
+    font-size: clamp(2.4rem, 7vw, 4rem);
+    font-weight: 900;
+    line-height: 1.1;
+    background: linear-gradient(135deg, var(--cyan) 0%, var(--violet-light) 50%, var(--lime) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  .hero-sub {
+    margin-top: 14px;
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: rgba(242,244,255,.7);
+    max-width: 520px;
+    margin-inline: auto;
+  }
+
+  /* progress bar */
+  .progress-wrap {
+    margin: 36px auto 0;
+    max-width: 500px;
+  }
+  .progress-label {
+    display: flex; justify-content: space-between;
+    font-size: .82rem; font-weight: 700;
+    color: rgba(242,244,255,.5);
+    margin-bottom: 8px;
+  }
+  .progress-bar-track {
+    height: 10px;
+    background: rgba(255,255,255,.1);
+    border-radius: 999px;
+    overflow: hidden;
+  }
+  .progress-bar-fill {
+    height: 100%;
+    width: 0%;
+    border-radius: 999px;
+    background: linear-gradient(90deg, var(--violet), var(--cyan));
+    transition: width .5s cubic-bezier(.4,0,.2,1);
+  }
+  .steps-dots {
+    display: flex; justify-content: center; gap: 10px;
+    margin-top: 14px;
+  }
+  .dot {
+    width: 12px; height: 12px;
+    border-radius: 50%;
+    background: rgba(255,255,255,.15);
+    border: 2px solid rgba(255,255,255,.2);
+    transition: all .3s;
+    cursor: pointer;
+  }
+  .dot.done  { background: var(--lime); border-color: var(--lime); }
+  .dot.active{ background: var(--cyan); border-color: var(--cyan); box-shadow: 0 0 10px var(--cyan); }
+
+  /* ── SECTION HEADING ── */
+  .section-title {
+    font-size: 1.35rem;
+    font-weight: 900;
+    color: var(--cyan);
+    letter-spacing: .03em;
+    margin: 48px 0 18px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .section-title span { font-size: 1.4rem; }
+
+  /* ── CARDS ── */
+  .card {
+    background: var(--card-bg);
+    border: 1.5px solid var(--card-border);
+    border-radius: 20px;
+    padding: 28px 26px;
+    backdrop-filter: blur(8px);
+    transition: transform .25s, border-color .25s;
+  }
+  .card:hover { transform: translateY(-3px); border-color: rgba(0,212,255,.5); }
+
+  /* ── STEPS ── */
+  .steps-container { display: flex; flex-direction: column; gap: 16px; }
+
+  .step-card {
+    background: var(--card-bg);
+    border: 1.5px solid var(--card-border);
+    border-radius: 20px;
+    overflow: hidden;
+    transition: border-color .3s, box-shadow .3s;
+  }
+  .step-card.active-step { border-color: var(--cyan); box-shadow: 0 0 24px rgba(0,212,255,.2); }
+  .step-card.done-step   { border-color: var(--lime); }
+
+  .step-header {
+    display: flex; align-items: center; gap: 16px;
+    padding: 20px 24px;
+    cursor: pointer;
+    user-select: none;
+  }
+  .step-num {
+    width: 44px; height: 44px; flex-shrink: 0;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.1rem; font-weight: 900;
+    background: rgba(255,255,255,.08);
+    border: 2px solid rgba(255,255,255,.15);
+    transition: all .3s;
+  }
+  .active-step .step-num { background: var(--cyan); color: var(--navy); border-color: var(--cyan); }
+  .done-step   .step-num { background: var(--lime); color: var(--navy); border-color: var(--lime); }
+
+  .step-info { flex: 1; }
+  .step-info h3 { font-size: 1rem; font-weight: 800; }
+  .step-info p  { font-size: .85rem; font-weight: 600; color: rgba(242,244,255,.55); margin-top: 2px; }
+
+  .step-arrow {
+    font-size: 1.2rem; color: rgba(242,244,255,.4);
+    transition: transform .3s;
+  }
+  .step-card.open .step-arrow { transform: rotate(90deg); }
+
+  .step-body {
+    max-height: 0; overflow: hidden;
+    transition: max-height .45s cubic-bezier(.4,0,.2,1), padding .3s;
+    padding: 0 24px;
+  }
+  .step-card.open .step-body {
+    max-height: 900px;
+    padding: 0 24px 24px;
+  }
+
+  @keyframes fondoVivo {
+
+    0%{
+        background-position: 0% 50%;
+    }
+
+    50%{
+        background-position: 100% 50%;
+    }
+
+    100%{
+        background-position: 0% 50%;
+    }
+}
+
+  /* ── ACTIVITIES INSIDE STEPS ── */
+  .activity-list { display: flex; flex-direction: column; gap: 12px; margin-top: 4px; }
+
+  .activity-item {
+    display: flex; align-items: flex-start; gap: 14px;
+    background: rgba(255,255,255,.04);
+    border-radius: 14px;
+    padding: 14px 16px;
+    border: 1px solid rgba(255,255,255,.07);
+  }
+  .activity-icon {
+    font-size: 1.5rem; flex-shrink: 0;
+    width: 40px; height: 40px;
+    display: flex; align-items: center; justify-content: center;
+    background: rgba(123,47,190,.25);
+    border-radius: 12px;
+  }
+  .activity-item h4 { font-size: .92rem; font-weight: 800; }
+  .activity-item p  { font-size: .82rem; font-weight: 600; color: rgba(242,244,255,.55); margin-top: 3px; }
+
+  /* checkboxes */
+  .check-row {
+    display: flex; align-items: center; gap: 12px;
+    margin-top: 14px;
+    padding: 10px 14px;
+    background: rgba(0,212,255,.07);
+    border-radius: 12px;
+    cursor: pointer;
+  }
+  .check-row input[type=checkbox] {
+    width: 22px; height: 22px;
+    accent-color: var(--lime);
+    cursor: pointer;
+  }
+  .check-row label { font-size: .88rem; font-weight: 700; cursor: pointer; }
+
+  /* ── GEOGEBRA EMBED ── */
+  .geogebra-wrap {
+    margin-top: 16px;
+    border-radius: 16px;
+    overflow: hidden;
+    border: 2px solid rgba(0,212,255,.3);
+  }
+  .geogebra-wrap iframe {
+    width: 100%; height: 380px;
+    display: block; border: none;
+  }
+  .embed-caption {
+    padding: 10px 14px;
+    background: rgba(0,212,255,.08);
+    font-size: .8rem; font-weight: 700;
+    color: rgba(242,244,255,.6);
+    display: flex; align-items: center; gap: 6px;
+  }
+
+  /* ── SOLIDS GRID ── */
+  .solids-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 14px;
+    margin-top: 6px;
+  }
+  .solid-card {
+    background: rgba(255,255,255,.05);
+    border: 1.5px solid rgba(255,255,255,.1);
+    border-radius: 18px;
+    padding: 18px 12px 16px;
+    text-align: center;
+    cursor: pointer;
+    transition: all .25s;
+  }
+  .solid-card:hover, .solid-card.selected {
+    border-color: var(--cyan);
+    background: rgba(0,212,255,.1);
+    transform: translateY(-4px);
+    box-shadow: 0 8px 24px rgba(0,212,255,.2);
+  }
+  .solid-card .emoji { font-size: 2.2rem; display: block; margin-bottom: 8px; }
+  .solid-card h4 { font-size: .85rem; font-weight: 800; }
+  .solid-card p  { font-size: .75rem; font-weight: 600; color: rgba(242,244,255,.5); margin-top: 3px; }
+
+  /* ── FORMULA BOX ── */
+  .formula-display {
+    display: none;
+    margin-top: 20px;
+    background: rgba(123,47,190,.15);
+    border: 2px solid var(--violet-light);
+    border-radius: 18px;
+    padding: 20px 22px;
+  }
+  .formula-display.visible { display: block; animation: popIn .35s cubic-bezier(.34,1.56,.64,1); }
+  @keyframes popIn {
+    from { transform: scale(.85); opacity: 0; }
+    to   { transform: scale(1);   opacity: 1; }
+  }
+  .formula-display h4 { font-size: 1rem; font-weight: 900; color: var(--violet-light); margin-bottom: 10px; }
+  .formula-box {
+    background: rgba(0,0,0,.3);
+    border-radius: 12px;
+    padding: 14px 18px;
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: var(--lime);
+    display: flex; align-items: center; gap: 10px;
+    margin-bottom: 8px;
+  }
+  .formula-note { font-size: .82rem; font-weight: 600; color: rgba(242,244,255,.55); }
+
+  /* ── QR SECTION ── */
+  .qr-section { margin-top: 8px; }
+  .qr-url-input {
+    width: 100%;
+    background: rgba(255,255,255,.07);
+    border: 1.5px solid rgba(255,255,255,.15);
+    border-radius: 14px;
+    padding: 14px 18px;
+    font-family: 'Nunito', sans-serif;
+    font-size: .95rem;
+    font-weight: 700;
+    color: var(--white);
+    outline: none;
+    transition: border-color .25s;
+    margin-bottom: 14px;
+  }
+  .qr-url-input:focus { border-color: var(--cyan); }
+  .qr-url-input::placeholder { color: rgba(242,244,255,.35); }
+
+  #qr-output {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px;
+    align-items: flex-start;
+  }
+  #qr-canvas-wrap {
+    background: #fff;
+    border-radius: 16px;
+    padding: 14px;
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+  }
+  #qr-canvas-wrap.visible { display: flex; animation: popIn .4s cubic-bezier(.34,1.56,.64,1); }
+  #qr-code-container canvas, #qr-code-container img { display: block !important; }
+  .qr-url-label {
+    font-size: .72rem;
+    font-weight: 800;
+    color: #333;
+    max-width: 160px;
+    word-break: break-all;
+    text-align: center;
+  }
+  .qr-info {
+    flex: 1;
+    min-width: 180px;
+    background: rgba(0,212,255,.07);
+    border: 1px solid rgba(0,212,255,.2);
+    border-radius: 14px;
+    padding: 16px;
+    display: none;
+  }
+  .qr-info.visible { display: block; }
+  .qr-info h4 { font-size: .9rem; font-weight: 800; color: var(--cyan); margin-bottom: 8px; }
+  .qr-info p  { font-size: .82rem; font-weight: 600; color: rgba(242,244,255,.6); margin-bottom: 5px; }
+
+  /* ── MAIN CTA ── */
+  .cta-wrap {
+    text-align: center;
+    margin: 50px 0 0;
+  }
+  .btn-cta {
+    display: inline-flex; align-items: center; gap: 12px;
+    background: linear-gradient(135deg, var(--violet) 0%, var(--cyan) 100%);
+    color: #fff;
+    font-family: 'Nunito', sans-serif;
+    font-size: 1.15rem;
+    font-weight: 900;
+    padding: 18px 40px;
+    border-radius: 999px;
+    border: none;
+    cursor: pointer;
+    box-shadow: 0 8px 32px rgba(123,47,190,.45);
+    transition: transform .2s, box-shadow .2s;
+    text-decoration: none;
+  }
+  .btn-cta:hover { transform: scale(1.05) translateY(-2px); box-shadow: 0 12px 40px rgba(0,212,255,.5); }
+  .btn-cta:active{ transform: scale(.98); }
+  .btn-cta .icon { font-size: 1.4rem; }
+
+  /* secondary buttons */
+  .btn {
+    display: inline-flex; align-items: center; gap: 8px;
+    font-family: 'Nunito', sans-serif;
+    font-size: .9rem; font-weight: 800;
+    padding: 12px 22px;
+    border-radius: 999px;
+    border: 2px solid;
+    cursor: pointer;
+    transition: all .2s;
+  }
+  .btn-primary {
+    background: var(--violet); color: #fff;
+    border-color: var(--violet);
+  }
+  .btn-primary:hover { background: var(--violet-light); border-color: var(--violet-light); }
+
+  .btn-cyan {
+    background: transparent; color: var(--cyan);
+    border-color: var(--cyan);
+  }
+  .btn-cyan:hover { background: rgba(0,212,255,.12); }
+
+  .btn-lime {
+    background: var(--lime); color: var(--navy);
+    border-color: var(--lime);
+  }
+  .btn-lime:hover { filter: brightness(1.1); }
+
+  /* ── QUIZ ── */
+  .quiz-question { font-size: 1rem; font-weight: 800; margin-bottom: 14px; color: var(--white); }
+  .quiz-options { display: flex; flex-direction: column; gap: 10px; }
+  .quiz-opt {
+    background: rgba(255,255,255,.05);
+    border: 1.5px solid rgba(255,255,255,.12);
+    border-radius: 14px;
+    padding: 14px 18px;
+    font-family: 'Nunito', sans-serif;
+    font-size: .9rem; font-weight: 700;
+    color: var(--white);
+    cursor: pointer;
+    text-align: left;
+    transition: all .2s;
+  }
+  .quiz-opt:hover { border-color: var(--cyan); background: rgba(0,212,255,.1); }
+  .quiz-opt.correct { border-color: var(--lime); background: rgba(181,255,58,.15); color: var(--lime); }
+  .quiz-opt.wrong   { border-color: #ff5f5f; background: rgba(255,95,95,.15); color: #ff5f5f; }
+  .quiz-feedback {
+    margin-top: 14px;
+    padding: 14px 16px;
+    border-radius: 14px;
+    font-size: .9rem; font-weight: 700;
+    display: none;
+  }
+  .quiz-feedback.show { display: block; animation: popIn .35s cubic-bezier(.34,1.56,.64,1); }
+  .quiz-feedback.ok  { background: rgba(181,255,58,.15); border: 1.5px solid var(--lime); color: var(--lime); }
+  .quiz-feedback.err { background: rgba(255,95,95,.12); border: 1.5px solid #ff5f5f; color: #ff5f5f; }
+  #quiz-next { display: none; margin-top: 12px; }
+  .score-display {
+    text-align: center; padding: 20px;
+    display: none;
+  }
+  .score-display.visible { display: block; animation: popIn .4s cubic-bezier(.34,1.56,.64,1); }
+  .score-num { font-size: 3.5rem; font-weight: 900; color: var(--lime); }
+  .score-label { font-size: 1rem; font-weight: 700; color: rgba(242,244,255,.6); }
+
+  /* ── CONFETTI ── */
+  .confetti-piece {
+    position: fixed;
+    width: 10px; height: 10px;
+    border-radius: 2px;
+    top: -20px;
+    animation: fall linear forwards;
+    z-index: 9999;
+    pointer-events: none;
+  }
+  @keyframes fall {
+    to { transform: translateY(110vh) rotate(720deg); opacity: 0; }
+  }
+
+  /* ── TOAST ── */
+  #toast {
+    position: fixed;
+    bottom: 30px; left: 50%; transform: translateX(-50%) translateY(80px);
+    background: linear-gradient(135deg, var(--violet), var(--cyan));
+    color: #fff;
+    font-family: 'Nunito', sans-serif;
+    font-size: .95rem; font-weight: 800;
+    padding: 14px 28px;
+    border-radius: 999px;
+    box-shadow: 0 8px 30px rgba(0,0,0,.4);
+    transition: transform .4s cubic-bezier(.34,1.56,.64,1);
+    z-index: 9998;
+    pointer-events: none;
+    white-space: nowrap;
+  }
+  #toast.show { transform: translateX(-50%) translateY(0); }
+
+  /* ── SCROLLBAR ── */
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: var(--navy); }
+  ::-webkit-scrollbar-thumb { background: var(--violet); border-radius: 3px; }
+
+  /* ── QR PRESET BUTTONS ── */
+  .qr-preset-btn {
+    background: rgba(255,255,255,.05);
+    border: 1.5px solid rgba(0,212,255,.25);
+    border-radius: 12px;
+    padding: 10px 8px;
+    font-family: 'Nunito', sans-serif;
+    font-size: .85rem; font-weight: 800;
+    color: var(--white);
+    cursor: pointer;
+    transition: all .2s;
+    text-align: center;
+  }
+  .qr-preset-btn:hover { border-color: var(--cyan); background: rgba(0,212,255,.1); }
+  .qr-preset-btn.active-preset {
+    background: rgba(181,255,58,.15);
+    border-color: var(--lime);
+    color: var(--lime);
+    box-shadow: 0 0 12px rgba(181,255,58,.25);
+  }
+
+  /* ── RESPONSIVE ── */
+  @media (max-width: 600px) {
+    .hero h1 { font-size: 2rem; }
+    .solids-grid { grid-template-columns: repeat(2, 1fr); }
+    .btn-cta { font-size: 1rem; padding: 16px 28px; }
+    .geogebra-wrap iframe { height: 260px; }
+  }
+</style>
+</head>
+<body>
+
+<canvas id="bg-canvas"></canvas>
+<div id="toast">✅ ¡Completado!</div>
+
+<div class="page">
+
+  <!-- ═══ HERO ═══ -->
+  <section class="hero">
+    <div class="hero-badge">🎓 Proyecto Educativo Interactivo</div>
+    <h1>MateGeo 3D</h1>
+    <p class="hero-sub">Explorá prismas, pirámides y cuerpos de revolución como nunca antes — ¡en 3D y Realidad Aumentada!</p>
+
+    <div class="progress-wrap">
+      <div class="progress-label">
+        <span>Tu progreso</span>
+        <span id="progress-pct">0%</span>
+      </div>
+      <div class="progress-bar-track">
+        <div class="progress-bar-fill" id="progress-fill"></div>
+      </div>
+      <div class="steps-dots" id="steps-dots"></div>
+    </div>
+  </section>
+
+  <!-- ═══ STEPS ═══ -->
+  <div class="section-title"><span>🗺️</span> Actividades paso a paso</div>
+  <div class="steps-container" id="steps-container">
+
+    <!-- STEP 1 -->
+    <div class="step-card" id="step-1">
+      <div class="step-header" onclick="toggleStep(1)">
+        <div class="step-num">1</div>
+        <div class="step-info">
+          <h3>Identificar el problema</h3>
+          <p>¿Qué cuerpos son los más difíciles de imaginar?</p>
+        </div>
+        <span class="step-arrow">▶</span>
+      </div>
+      <div class="step-body">
+        <div class="activity-list">
+          <div class="activity-item">
+            <div class="activity-icon">👀</div>
+            <div>
+              <h4>Observación en clase</h4>
+              <p>Anotá qué temas de geometría les cuestan más a tus compañeros. ¿Qué caras no ven? ¿Qué medidas no entienden?</p>
+            </div>
+          </div>
+          <div class="activity-item">
+            <div class="activity-icon">📋</div>
+            <div>
+              <h4>Encuesta digital</h4>
+              <p>Creá un Google Form con preguntas sobre cuál cuerpo geométrico les cuesta más imaginar en 3D.</p>
+            </div>
+          </div>
+          <div class="activity-item">
+            <div class="activity-icon">📊</div>
+            <div>
+              <h4>Análisis de resultados</h4>
+              <p>Procesá las respuestas y decidí qué cuerpos van a priorizar en la plataforma.</p>
+            </div>
+          </div>
+        </div>
+        <label class="check-row">
+          <input type="checkbox" id="chk-1" onchange="updateProgress()"/>
+          <label for="chk-1">✅ Terminé de identificar el problema</label>
+        </label>
+      </div>
+    </div>
+
+    <!-- STEP 2 -->
+    <div class="step-card" id="step-2">
+      <div class="step-header" onclick="toggleStep(2)">
+        <div class="step-num">2</div>
+        <div class="step-info">
+          <h3>Explorar los cuerpos geométricos</h3>
+          <p>Tocá cada figura y descubrí sus fórmulas</p>
+        </div>
+        <span class="step-arrow">▶</span>
+      </div>
+      <div class="step-body">
+        <p style="font-size:.88rem;font-weight:600;color:rgba(242,244,255,.6);margin-bottom:16px;">Seleccioná un cuerpo geométrico para ver sus propiedades y fórmulas:</p>
+        <div class="solids-grid" id="solids-grid">
+          <div class="solid-card" onclick="selectSolid('cubo')"        ><span class="emoji">🔲</span><h4>Cubo</h4><p>Poliedro regular</p></div>
+          <div class="solid-card" onclick="selectSolid('prisma')"      ><span class="emoji">📦</span><h4>Prisma</h4><p>Poliedro</p></div>
+          <div class="solid-card" onclick="selectSolid('piramide')"    ><span class="emoji">🔺</span><h4>Pirámide</h4><p>Poliedro</p></div>
+          <div class="solid-card" onclick="selectSolid('cilindro')"    ><span class="emoji">🥫</span><h4>Cilindro</h4><p>Cuerpo de revolución</p></div>
+          <div class="solid-card" onclick="selectSolid('cono')"        ><span class="emoji">🍦</span><h4>Cono</h4><p>Cuerpo de revolución</p></div>
+          <div class="solid-card" onclick="selectSolid('esfera')"      ><span class="emoji">🔵</span><h4>Esfera</h4><p>Cuerpo de revolución</p></div>
+        </div>
+        <div class="formula-display" id="formula-display"></div>
+        <label class="check-row" style="margin-top:18px;">
+          <input type="checkbox" id="chk-2" onchange="updateProgress()"/>
+          <label for="chk-2">✅ Exploré al menos 3 cuerpos geométricos</label>
+        </label>
+      </div>
+    </div>
+
+    <!-- STEP 3 -->
+    <div class="step-card" id="step-3">
+      <div class="step-header" onclick="toggleStep(3)">
+        <div class="step-num">3</div>
+        <div class="step-info">
+          <h3>Visor interactivo 3D</h3>
+          <p>Rotá los cuerpos con GeoGebra</p>
+        </div>
+        <span class="step-arrow">▶</span>
+      </div>
+      <div class="step-body">
+        <p style="font-size:.88rem;font-weight:600;color:rgba(242,244,255,.6);margin-bottom:12px;">Elegí un cuerpo para verlo en 3D. Podés abrirlo acá mismo o en una pestaña nueva para girarlo con el mouse o el dedo:</p>
+
+        <!-- Selector de cuerpo para el visor -->
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;" id="viewer-btns">
+          <button class="btn btn-primary" onclick="loadViewer('cube')">🔲 Cubo</button>
+          <button class="btn btn-primary" onclick="loadViewer('prism')">📦 Prisma</button>
+          <button class="btn btn-primary" onclick="loadViewer('pyramid')">🔺 Pirámide</button>
+          <button class="btn btn-primary" onclick="loadViewer('cylinder')">🥫 Cilindro</button>
+          <button class="btn btn-primary" onclick="loadViewer('cone')">🍦 Cono</button>
+          <button class="btn btn-primary" onclick="loadViewer('sphere')">🔵 Esfera</button>
+        </div>
+
+        <div class="geogebra-wrap" id="viewer-wrap" style="display:none;">
+            <div id="three-viewer"
+                style="
+                width:100%;
+                height:450px;
+                border-radius:20px;
+                overflow:hidden;
+                background:linear-gradient(
+                     -45deg,
+                   #3b6cac,
+                   #979ca7,
+                   #535b61,
+                   #4b75af
+              );
+              background-size:400% 400%;
+              animation:fondoVivo 12s ease infinite;">
+            </div>
+
+           <div class="embed-caption">
+               🖱️ Arrastrá para observar la figura
+               &nbsp;|&nbsp;
+               <span id="viewer-label">—</span>
+          </div>
+
+        </div>
+
+        <div style="margin-top:14px;padding:12px 16px;background:rgba(0,212,255,.07);border-radius:14px;border:1px solid rgba(0,212,255,.2);">
+          <p style="font-size:.82rem;font-weight:700;color:rgba(242,244,255,.7);">📱 <strong>¿El iframe no carga en tu navegador?</strong> Abrí el visor directo en el celular:</p>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;">
+            <a class="btn btn-cyan" href="https://www.geogebra.org/calculator/3d" target="_blank" style="font-size:.8rem;padding:10px 16px;">🌐 GeoGebra 3D (celular)</a>
+            <a class="btn btn-cyan" href="https://www.geogebra.org/m/w5gshmkj" target="_blank" style="font-size:.8rem;padding:10px 16px;">📐 Cuerpos geométricos</a>
+          </div>
+        </div>
+
+        <label class="check-row" style="margin-top:16px;">
+          <input type="checkbox" id="chk-3" onchange="updateProgress()"/>
+          <label for="chk-3">✅ Exploré el visor 3D y roté los cuerpos</label>
+        </label>
+      </div>
+    </div>
+
+    <!-- STEP 4 -->
+    <div class="step-card" id="step-4">
+      <div class="step-header" onclick="toggleStep(4)">
+        <div class="step-num">4</div>
+        <div class="step-info">
+          <h3>Generador de código QR para RA</h3>
+          <p>Creá un QR para ver cuerpos en Realidad Aumentada</p>
+        </div>
+        <span class="step-arrow">▶</span>
+      </div>
+      <div class="step-body">
+        <p style="font-size:.88rem;font-weight:600;color:rgba(242,244,255,.6);margin-bottom:14px;">Generá un código QR para cada cuerpo geométrico. Al escanearlo con el celular, se abre el visor 3D directamente en el navegador.</p>
+
+        <!-- Quick preset buttons -->
+        <p style="font-size:.82rem;font-weight:800;color:var(--cyan);margin-bottom:10px;">⚡ Acceso rápido — elegí un cuerpo:</p>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:18px;" id="qr-presets">
+          <button class="qr-preset-btn" onclick="setPresetQR('cubo')">🔲 Cubo</button>
+          <button class="qr-preset-btn" onclick="setPresetQR('prisma')">📦 Prisma</button>
+          <button class="qr-preset-btn" onclick="setPresetQR('piramide')">🔺 Pirámide</button>
+          <button class="qr-preset-btn" onclick="setPresetQR('cilindro')">🥫 Cilindro</button>
+          <button class="qr-preset-btn" onclick="setPresetQR('cono')">🍦 Cono</button>
+          <button class="qr-preset-btn" onclick="setPresetQR('esfera')">🔵 Esfera</button>
+        </div>
+
+        <p style="font-size:.82rem;font-weight:800;color:var(--cyan);margin-bottom:8px;">✏️ O escribí tu propia URL:</p>
+        <div class="qr-section">
+          <input class="qr-url-input" type="url" id="qr-url" placeholder="https://..."/>
+          <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:18px;">
+            <button class="btn btn-lime" onclick="generateQR()">⚡ Generar QR</button>
+          </div>
+
+          <div id="qr-output">
+            <div id="qr-canvas-wrap">
+              <div id="qr-code-container"></div>
+              <p class="qr-url-label" id="qr-url-label"></p>
+              <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center;">
+                <button class="btn btn-lime" style="font-size:.78rem;padding:8px 16px;" onclick="downloadQR()">⬇️ Descargar PNG</button>
+                <button class="btn btn-cyan" style="font-size:.78rem;padding:8px 16px;" id="qr-open-btn" onclick="openQRUrl()">🔗 Abrir URL</button>
+              </div>
+            </div>
+            <div class="qr-info" id="qr-info">
+              <h4>📱 ¿Cómo usar el QR en el aula?</h4>
+              <p>1️⃣ Hacé clic en <strong>⬇️ Descargar PNG</strong> y guardá la imagen</p>
+              <p>2️⃣ Imprimí el QR o proyectalo en el pizarrón</p>
+              <p>3️⃣ Cada alumno abre la cámara del celular</p>
+              <p>4️⃣ Apunta al código y se abre el visor 3D automáticamente ✅</p>
+              <p style="margin-top:10px;padding:8px;background:rgba(181,255,58,.1);border-radius:8px;font-size:.78rem;">💡 <strong>Tip:</strong> El QR abre GeoGebra directamente en el navegador del celular — no necesita instalar nada.</p>
+            </div>
+          </div>
+        </div>
+
+        <label class="check-row" style="margin-top:16px;">
+          <input type="checkbox" id="chk-4" onchange="updateProgress()"/>
+          <label for="chk-4">✅ Generé mi primer código QR</label>
+        </label>
+      </div>
+    </div>
+
+    <!-- STEP 5 -->
+    <div class="step-card" id="step-5">
+      <div class="step-header" onclick="toggleStep(5)">
+        <div class="step-num">5</div>
+        <div class="step-info">
+          <h3>Desafío final: Cuestionario</h3>
+          <p>Poné a prueba lo que aprendiste</p>
+        </div>
+        <span class="step-arrow">▶</span>
+      </div>
+      <div class="step-body">
+        <div id="quiz-area"></div>
+        <div class="score-display" id="score-display">
+          <div class="score-num" id="score-num">0/5</div>
+          <div class="score-label">respuestas correctas</div>
+          <p style="margin-top:16px;font-size:.9rem;font-weight:700;color:rgba(242,244,255,.7);" id="score-msg"></p>
+          <button class="btn btn-primary" style="margin-top:16px;" onclick="restartQuiz()">🔄 Volver a intentar</button>
+        </div>
+        <label class="check-row" style="margin-top:16px;">
+          <input type="checkbox" id="chk-5" onchange="updateProgress()"/>
+          <label for="chk-5">✅ Completé el desafío final</label>
+        </label>
+      </div>
+    </div>
+
+  </div><!-- /steps-container -->
+
+  <!-- ═══ CTA ═══ -->
+  <div class="cta-wrap">
+    <a class="btn-cta" href="https://www.geogebra.org/3d" target="_blank">
+      <span class="icon">🚀</span>
+      Explorar GeoGebra 3D ahora
+    </a>
+    <p style="margin-top:18px;font-size:.82rem;font-weight:600;color:rgba(242,244,255,.4);">
+      También podés explorar <a href="https://assemblrworld.com/" target="_blank" style="color:var(--cyan);">Assemblr Edu</a> para crear experiencias de Realidad Aumentada gratis.
+    </p>
+  </div>
+
+  <!-- ═══ RESOURCES ═══ -->
+  <div class="section-title" style="margin-top:56px;"><span>🔗</span> Recursos del proyecto</div>
+  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:14px;margin-bottom:60px;">
+    <a href="https://www.geogebra.org/3d" target="_blank" class="card" style="text-decoration:none;">
+      <div style="font-size:2rem;margin-bottom:8px;">📐</div>
+      <h3 style="font-size:.95rem;font-weight:800;">GeoGebra 3D</h3>
+      <p style="font-size:.8rem;font-weight:600;color:rgba(242,244,255,.5);margin-top:4px;">Cuerpos geométricos interactivos</p>
+    </a>
+    <a href="https://assemblrworld.com/" target="_blank" class="card" style="text-decoration:none;">
+      <div style="font-size:2rem;margin-bottom:8px;">📱</div>
+      <h3 style="font-size:.95rem;font-weight:800;">Assemblr Edu</h3>
+      <p style="font-size:.8rem;font-weight:600;color:rgba(242,244,255,.5);margin-top:4px;">Realidad Aumentada gratuita</p>
+    </a>
+    <a href="https://www.canva.com/" target="_blank" class="card" style="text-decoration:none;">
+      <div style="font-size:2rem;margin-bottom:8px;">🎨</div>
+      <h3 style="font-size:.95rem;font-weight:800;">Canva</h3>
+      <p style="font-size:.8rem;font-weight:600;color:rgba(242,244,255,.5);margin-top:4px;">Diseño visual del sitio web</p>
+    </a>
+    <a href="https://sites.google.com/" target="_blank" class="card" style="text-decoration:none;">
+      <div style="font-size:2rem;margin-bottom:8px;">🌐</div>
+      <h3 style="font-size:.95rem;font-weight:800;">Google Sites</h3>
+      <p style="font-size:.8rem;font-weight:600;color:rgba(242,244,255,.5);margin-top:4px;">Armar la plataforma web</p>
+    </a>
+  </div>
+
+</div><!-- /page -->
+
+<script>
+// ══════════════════════════════════════════════
+//  ANIMATED BACKGROUND
+// ══════════════════════════════════════════════
+const canvas = document.getElementById('bg-canvas');
+const ctx = canvas.getContext('2d');
+let shapes = [];
+
+function resize() {
+  canvas.width  = window.innerWidth;
+  canvas.height = window.innerHeight;
+}
+resize();
+window.addEventListener('resize', resize);
+
+const COLORS = ['#7B2FBE','#00D4FF','#B5FF3A','#A855F7'];
+
+function makeShape() {
+  return {
+    x: Math.random() * canvas.width,
+    y: Math.random() * canvas.height,
+    r: 18 + Math.random() * 50,
+    vx: (Math.random() - .5) * .4,
+    vy: (Math.random() - .5) * .4,
+    rot: Math.random() * Math.PI * 2,
+    vr: (Math.random() - .5) * .01,
+    color: COLORS[Math.floor(Math.random() * COLORS.length)],
+    sides: [3,4,6][Math.floor(Math.random()*3)],
+  };
+}
+
+for (let i = 0; i < 18; i++) shapes.push(makeShape());
+
+function drawPoly(x, y, r, sides, rot, color) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(rot);
+  ctx.beginPath();
+  for (let i = 0; i <= sides; i++) {
+    const a = (i / sides) * Math.PI * 2 - Math.PI / 2;
+    i === 0 ? ctx.moveTo(Math.cos(a)*r, Math.sin(a)*r)
+             : ctx.lineTo(Math.cos(a)*r, Math.sin(a)*r);
+  }
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+  ctx.restore();
+}
+
+function animateBg() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  for (const s of shapes) {
+    s.x += s.vx; s.y += s.vy; s.rot += s.vr;
+    if (s.x < -60) s.x = canvas.width + 60;
+    if (s.x > canvas.width + 60) s.x = -60;
+    if (s.y < -60) s.y = canvas.height + 60;
+    if (s.y > canvas.height + 60) s.y = -60;
+    drawPoly(s.x, s.y, s.r, s.sides, s.rot, s.color);
+  }
+  requestAnimationFrame(animateBg);
+}
+animateBg();
+
+// ══════════════════════════════════════════════
+//  PROGRESS
+// ══════════════════════════════════════════════
+const TOTAL_STEPS = 5;
+const dots = document.getElementById('steps-dots');
+for (let i = 1; i <= TOTAL_STEPS; i++) {
+  const d = document.createElement('div');
+  d.className = 'dot'; d.id = 'dot-'+i;
+  d.onclick = () => toggleStep(i);
+  dots.appendChild(d);
+}
+
+function updateProgress() {
+  let done = 0;
+  for (let i = 1; i <= TOTAL_STEPS; i++) {
+    const chk = document.getElementById('chk-'+i);
+    const dot = document.getElementById('dot-'+i);
+    const card = document.getElementById('step-'+i);
+    if (chk && chk.checked) {
+      done++;
+      card.classList.add('done-step');
+      card.classList.remove('active-step');
+      dot.className = 'dot done';
+    }
+  }
+  const pct = Math.round((done / TOTAL_STEPS) * 100);
+  document.getElementById('progress-fill').style.width = pct + '%';
+  document.getElementById('progress-pct').textContent = pct + '%';
+
+  if (done === TOTAL_STEPS) {
+    showToast('🎉 ¡Completaste todas las actividades!');
+    launchConfetti();
+  }
+}
+
+// ══════════════════════════════════════════════
+//  STEP ACCORDION
+// ══════════════════════════════════════════════
+let openStep = null;
+
+function toggleStep(n) {
+  const card = document.getElementById('step-'+n);
+  const isOpen = card.classList.contains('open');
+
+  // close all
+  document.querySelectorAll('.step-card').forEach(c => c.classList.remove('open','active-step'));
+  document.querySelectorAll('.dot').forEach((d,i) => {
+    const chk = document.getElementById('chk-'+(i+1));
+    if (!(chk && chk.checked)) d.className = 'dot';
+  });
+
+  if (!isOpen) {
+    card.classList.add('open');
+    const chk = document.getElementById('chk-'+n);
+    if (!(chk && chk.checked)) card.classList.add('active-step');
+    const dot = document.getElementById('dot-'+n);
+    const chk2 = document.getElementById('chk-'+n);
+    if (!(chk2 && chk2.checked)) dot.className = 'dot active';
+    openStep = n;
+    // init quiz on step 5 open
+    if (n === 5) initQuiz();
+  } else {
+    openStep = null;
+  }
+}
+
+// open first step on load
+window.addEventListener('DOMContentLoaded', () => { toggleStep(1); updateProgress(); });
+
+// ══════════════════════════════════════════════
+//  SOLIDS & FORMULAS
+// ══════════════════════════════════════════════
+const FORMULAS = {
+  cubo: {
+    name: '🔲 Cubo', emoji: '🔲',
+    props: 'Caras: 6 cuadradas &nbsp;|&nbsp; Vértices: 8 &nbsp;|&nbsp; Aristas: 12',
+    formulas: [
+      { label: 'Volumen',        f: 'V = a³',           note: 'a = longitud del lado' },
+      { label: 'Área total',     f: 'A = 6 · a²',       note: 'a = longitud del lado' },
+    ]
+  },
+  prisma: {
+    name: '📦 Prisma rectangular', emoji: '📦',
+    props: 'Caras: 6 &nbsp;|&nbsp; Vértices: 8 &nbsp;|&nbsp; Aristas: 12',
+    formulas: [
+      { label: 'Volumen',    f: 'V = largo × ancho × alto',  note: '' },
+      { label: 'Área total', f: 'A = 2(la + ah + lh)',       note: 'l=largo, a=ancho, h=alto' },
+    ]
+  },
+  piramide: {
+    name: '🔺 Pirámide cuadrangular', emoji: '🔺',
+    props: 'Caras: 5 &nbsp;|&nbsp; Vértices: 5 &nbsp;|&nbsp; Aristas: 8',
+    formulas: [
+      { label: 'Volumen',     f: 'V = (A base × h) / 3',  note: 'h = altura' },
+      { label: 'Área lateral',f: 'AL = Perímetro × ap / 2', note: 'ap = apotema' },
+    ]
+  },
+  cilindro: {
+    name: '🥫 Cilindro', emoji: '🥫',
+    props: 'Caras: 2 circulares + 1 lateral &nbsp;|&nbsp; Generado por: un rectángulo girando',
+    formulas: [
+      { label: 'Volumen',    f: 'V = π · r² · h',           note: 'r = radio, h = altura' },
+      { label: 'Área total', f: 'A = 2π·r·h + 2π·r²',      note: 'lateral + 2 bases' },
+    ]
+  },
+  cono: {
+    name: '🍦 Cono', emoji: '🍦',
+    props: 'Caras: 1 circular + 1 lateral &nbsp;|&nbsp; Generado por: un triángulo girando',
+    formulas: [
+      { label: 'Volumen',     f: 'V = (π · r² · h) / 3',   note: 'r = radio, h = altura' },
+      { label: 'Área lateral',f: 'AL = π · r · g',          note: 'g = generatriz = √(r²+h²)' },
+    ]
+  },
+  esfera: {
+    name: '🔵 Esfera', emoji: '🔵',
+    props: 'Sin caras planas &nbsp;|&nbsp; Generada por: un semicírculo girando',
+    formulas: [
+      { label: 'Volumen',   f: 'V = (4/3) · π · r³',  note: 'r = radio' },
+      { label: 'Área total',f: 'A = 4 · π · r²',      note: 'r = radio' },
+    ]
+  },
+};
+
+let selectedSolid = null, solidCount = 0;
+
+function selectSolid(id) {
+  // toggle selection
+  document.querySelectorAll('.solid-card').forEach(c => c.classList.remove('selected'));
+  const cards = document.querySelectorAll('#solids-grid .solid-card');
+  const idx = ['cubo','prisma','piramide','cilindro','cono','esfera'].indexOf(id);
+  if (idx >= 0) cards[idx].classList.add('selected');
+
+  selectedSolid = id;
+  solidCount++;
+
+  const data = FORMULAS[id];
+  const el = document.getElementById('formula-display');
+
+  let html = `<h4>${data.name}</h4>
+  <p style="font-size:.8rem;font-weight:600;color:rgba(242,244,255,.5);margin-bottom:12px;">${data.props}</p>`;
+
+  for (const f of data.formulas) {
+    html += `<div class="formula-box"><span style="font-size:.8rem;font-weight:700;color:rgba(242,244,255,.4);min-width:90px;">${f.label}:</span> ${f.f}</div>`;
+    if (f.note) html += `<p class="formula-note" style="margin-bottom:8px;">📌 ${f.note}</p>`;
+  }
+  el.innerHTML = html;
+  el.classList.add('visible');
+  showToast(`${data.emoji} ¡${data.name.replace(/\S+\s/,'')} seleccionada!`);
+}
+
+// ══════════════════════════════════════════════
+//  VIEWER (Step 3)
+// ══════════════════════════════════════════════
+// These are confirmed mobile-friendly GeoGebra URLs (open in any browser)
+const VIEWER_URLS = {
+  cube: {
+    url: 'https://www.geogebra.org/3d/j6y59s3w?embed',
+    label: 'Cubo'
+  },
+  prism: {
+    url: 'https://www.geogebra.org/3d/vmc4uhpq?embed',
+    label: 'Prisma'
+  },
+  pyramid: {
+    url: 'https://www.geogebra.org/3d/argjhbwv?embed',
+    label: 'Pirámide'
+  },
+  cylinder: {
+    url: 'https://www.geogebra.org/3d/cggzx4qp?embed',
+    label: 'Cilindro'
+  },
+  cone: {
+    url: 'https://www.geogebra.org/3d/xe6xghkw?embed',
+    label: 'Cono'
+  },
+  sphere: {
+    url: 'https://www.geogebra.org/3d/dzf8zszw?embed',
+    label: 'Esfera'
+  }
+};
+
+
+let scene;
+let camera;
+let renderer;
+let mesh;
+let controls;
+
+
+function initViewer() {
+
+    const container =
+        document.getElementById("three-viewer");
+
+    scene = new THREE.Scene();
+
+    camera =
+        new THREE.PerspectiveCamera(
+            75,
+            container.clientWidth /
+            container.clientHeight,
+            0.1,
+            1000
+        );
+
+    renderer =
+        new THREE.WebGLRenderer({
+            antialias:true,
+            alpha:true
+        });
+
+    renderer.setSize(
+        container.clientWidth,
+        container.clientHeight
+    );
+
+    container.innerHTML = "";
+
+    container.appendChild(
+        renderer.domElement
+    );
+
+    const ambientLight =
+    new THREE.AmbientLight(
+        0xffffff,
+        0.7
+    );
+
+scene.add(ambientLight);
+
+const light =
+    new THREE.DirectionalLight(
+        0xffffff,
+        0.9
+    );
+
+    light.position.set(
+        5,
+        5,
+        5
+    );
+
+    scene.add(light);
+    
+
+    camera.position.z = 4;
+
+    controls = new THREE.OrbitControls(
+    camera,
+    renderer.domElement
+);
+
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.05;
+
+    controls.enableZoom = true;
+
+    controls.autoRotate = false;
+
+    animate();
+}
+
+function animate() {
+
+    requestAnimationFrame(
+        animate
+    );
+
+    controls.update();
+
+    renderer.render(
+       scene,
+       camera
+    );
+}
+
+
+function loadViewer(key) {
+
+  const wrap =
+        document.getElementById(
+            "viewer-wrap"
+        );
+
+    wrap.style.display = "block";
+
+    initViewer();
+
+    if(mesh){
+        scene.remove(mesh);
+    }
+
+    let geometry;
+
+    switch(key){
+
+        case "cube":
+            geometry =
+                new THREE.BoxGeometry(
+                    4,
+                    4,
+                    4
+                );
+            break;
+
+        case "prism":
+            geometry =
+                new THREE.BoxGeometry(
+                    3,
+                    2.5,
+                    4
+                );
+            break;
+
+        case "pyramid":
+
+            geometry =
+                new THREE.ConeGeometry(
+                    2.5,
+                    4,
+                    4
+                );
+            break;
+
+        case "cylinder":
+
+            geometry =
+                new THREE.CylinderGeometry(
+                    2,
+                    2,
+                    4,
+                    32
+                );
+            break;
+
+        case "cone":
+
+            geometry =
+                new THREE.ConeGeometry(
+                    2,
+                    4,
+                    32
+                );
+            break;
+
+        case "sphere":
+
+            geometry =
+                new THREE.SphereGeometry(
+                    2.3,
+                    32,
+                    32
+                );
+            break;
+    }
+
+let color ;
+
+switch(key){
+
+    case "cube":
+        color =  0xff69b4;
+        break;
+
+    case "prism":
+        color =  0x39FF14;
+        break;
+
+    case "pyramid":
+        color = 0xff4444;
+        break;
+
+    case "cylinder":
+        color = 0x9932cc;
+        break;
+
+    case "cone":
+        color = 0xff8c00;
+        break;
+
+    case "sphere":
+        color = 0x00ffff;
+        break;
+}
+
+const material =
+    new THREE.MeshPhongMaterial({
+        color: color
+    });
+
+    mesh =
+        new THREE.Mesh(
+            geometry,
+            material
+        );
+
+    scene.add(mesh);
+
+    camera.position.set(4, 3, 5);
+
+    camera.lookAt(
+       mesh.position
+    );
+
+
+    const labels = {
+    cube: "🔲 Cubo",
+    prism: "📦 Prisma",
+    pyramid: "🔺 Pirámide",
+    cylinder: "🥫 Cilindro",
+    cone: "🍦 Cono",
+    sphere: "🔵 Esfera"
+};
+
+document
+    .getElementById("viewer-label")
+    .textContent = labels[key];
+}
+
+// ══════════════════════════════════════════════
+//  QR GENERATOR
+// ══════════════════════════════════════════════
+// URLs that open directly in any mobile browser — no app needed
+const PRESETS = {
+  cubo: 'https://www.geogebra.org/3d/j6y59s3w',
+  prisma: 'https://www.geogebra.org/3d/vmc4uhpq',
+  piramide: 'https://www.geogebra.org/3d/argjhbwv',
+  cilindro: 'https://www.geogebra.org/3d/cggzx4qp',
+  cono: 'https://www.geogebra.org/3d/xe6xghkw',
+  esfera: 'https://www.geogebra.org/3d/dzf8zszw'
+};
+
+let currentQRUrl = '';
+
+function setPresetQR(key) {
+  const url = PRESETS[key];
+
+  document.getElementById('qr-url').value = url;
+  currentQRUrl = url;
+
+  generateQR();
+}
+
+let qrInstance = null;
+
+function generateQR() {
+  const url = document.getElementById('qr-url').value.trim();
+  if (!url) { showToast('⚠️ Ingresá una URL primero'); return; }
+  currentQRUrl = url;
+
+  const container = document.getElementById('qr-code-container');
+  container.innerHTML = '';
+  if (qrInstance) { try { qrInstance.clear(); } catch(e) {} }
+
+  try {
+    qrInstance = new QRCode(container, {
+      text: url,
+      width: 180,
+      height: 180,
+      colorDark: '#0D1B2A',
+      colorLight: '#ffffff',
+      correctLevel: QRCode.CorrectLevel.M,
+    });
+  } catch(e) {
+    container.innerHTML = '<p style="color:#ff5f5f;font-size:.8rem;">Error al generar QR. Verificá la URL.</p>';
+    return;
+  }
+
+  const shortLabel = url.replace('https://www.geogebra.org/m/','GeoGebra: ');
+  document.getElementById('qr-url-label').textContent = shortLabel.length > 44 ? shortLabel.slice(0,41)+'…' : shortLabel;
+  document.getElementById('qr-canvas-wrap').classList.add('visible');
+  document.getElementById('qr-info').classList.add('visible');
+  showToast('⚡ ¡QR listo! Escanealo con cualquier celular');
+}
+
+function downloadQR() {
+  const container = document.getElementById('qr-code-container');
+  const img = container.querySelector('img');
+  const cvs = container.querySelector('canvas');
+  let dataUrl;
+  if (img && img.src) { dataUrl = img.src; }
+  else if (cvs) { dataUrl = cvs.toDataURL('image/png'); }
+  else { showToast('⚠️ Generá el QR primero'); return; }
+  const a = document.createElement('a');
+  a.href = dataUrl;
+  a.download = 'MateGeo3D_QR.png';
+  a.click();
+}
+
+function openQRUrl() {
+  if (currentQRUrl) window.open(currentQRUrl, '_blank');
+  else showToast('⚠️ Generá el QR primero');
+}
+
+// ══════════════════════════════════════════════
+//  QUIZ
+// ══════════════════════════════════════════════
+const QUESTIONS = [
+  {
+    q: '¿Cuántas caras tiene un cubo?',
+    opts: ['4','6','8','12'],
+    ans: 1,
+    exp: '✅ ¡Correcto! Un cubo tiene 6 caras cuadradas iguales.'
+  },
+  {
+    q: '¿Qué fórmula corresponde al volumen de un cilindro?',
+    opts: ['V = a³','V = π·r²·h','V = (4/3)·π·r³','V = (A·h)/3'],
+    ans: 1,
+    exp: '✅ ¡Exacto! V = π·r²·h, donde r es el radio y h la altura.'
+  },
+  {
+    q: '¿Qué figura plana, al girar en torno a su eje, genera una esfera?',
+    opts: ['Un triángulo rectángulo','Un cuadrado','Un semicírculo','Un rectángulo'],
+    ans: 2,
+    exp: '✅ ¡Muy bien! Un semicírculo girando 360° alrededor de su diámetro genera una esfera.'
+  },
+  {
+    q: '¿Cuántos vértices tiene una pirámide cuadrangular?',
+    opts: ['4','5','6','8'],
+    ans: 1,
+    exp: '✅ ¡Correcto! Tiene 4 vértices en la base + 1 en el ápice = 5 vértices.'
+  },
+  {
+    q: 'El Diseño Universal para el Aprendizaje (DUA) propone:',
+    opts: [
+      'Enseñar solo con pizarrón y marcadores',
+      'Ofrecer múltiples formas de presentar el contenido para incluir a todos',
+      'Usar solo libros de texto',
+      'Evaluar con un único examen escrito',
+    ],
+    ans: 1,
+    exp: '✅ ¡Perfecto! El DUA busca que ningún estudiante quede excluido por su manera de aprender.'
+  },
+];
+
+let qIdx = 0, score = 0;
+
+function initQuiz() {
+  qIdx = 0; score = 0;
+  document.getElementById('score-display').classList.remove('visible');
+  renderQuestion();
+}
+
+function renderQuestion() {
+  const area = document.getElementById('quiz-area');
+  if (qIdx >= QUESTIONS.length) {
+    area.innerHTML = '';
+    const s = document.getElementById('score-display');
+    s.classList.add('visible');
+    document.getElementById('score-num').textContent = score + '/' + QUESTIONS.length;
+    const msgs = ['¡Seguí practicando, vas por buen camino! 💪','¡Muy bien, ya dominás los conceptos! 🌟','¡Perfecto! ¡Sos un genio de la geometría! 🏆'];
+    const m = score <= 2 ? msgs[0] : score <= 4 ? msgs[1] : msgs[2];
+    document.getElementById('score-msg').textContent = m;
+    if (score === QUESTIONS.length) launchConfetti();
+    return;
+  }
+  const q = QUESTIONS[qIdx];
+  let html = `<p class="quiz-question">Pregunta ${qIdx+1}/${QUESTIONS.length}: ${q.q}</p>
+  <div class="quiz-options">`;
+  q.opts.forEach((o, i) => {
+    html += `<button class="quiz-opt" onclick="answerQuiz(${i})">${o}</button>`;
+  });
+  html += `</div>
+  <div class="quiz-feedback" id="qfb"></div>
+  <button class="btn btn-primary" id="quiz-next" onclick="nextQuestion()">Siguiente ▶</button>`;
+  area.innerHTML = html;
+}
+
+function answerQuiz(i) {
+  const q = QUESTIONS[qIdx];
+  const opts = document.querySelectorAll('.quiz-opt');
+  opts.forEach(o => o.disabled = true);
+  const fb = document.getElementById('qfb');
+  const nextBtn = document.getElementById('quiz-next');
+  if (i === q.ans) {
+    score++;
+    opts[i].classList.add('correct');
+    fb.className = 'quiz-feedback show ok';
+    fb.textContent = q.exp;
+    showToast('🎉 ¡Respuesta correcta!');
+  } else {
+    opts[i].classList.add('wrong');
+    opts[q.ans].classList.add('correct');
+    fb.className = 'quiz-feedback show err';
+    fb.textContent = '❌ No era esa. ' + q.exp;
+  }
+  nextBtn.style.display = 'inline-flex';
+}
+
+function nextQuestion() { qIdx++; renderQuestion(); }
+
+function restartQuiz() { initQuiz(); }
+
+// ══════════════════════════════════════════════
+//  TOAST
+// ══════════════════════════════════════════════
+let toastTimer = null;
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 2800);
+}
+
+// ══════════════════════════════════════════════
+//  CONFETTI
+// ══════════════════════════════════════════════
+function launchConfetti() {
+  const colors = ['#7B2FBE','#00D4FF','#B5FF3A','#A855F7','#FF6B6B','#FFD93D'];
+  for (let i = 0; i < 80; i++) {
+    const el = document.createElement('div');
+    el.className = 'confetti-piece';
+    el.style.left = Math.random() * 100 + 'vw';
+    el.style.top  = '-20px';
+    el.style.background = colors[Math.floor(Math.random()*colors.length)];
+    el.style.width  = (6 + Math.random()*10) + 'px';
+    el.style.height = (6 + Math.random()*10) + 'px';
+    el.style.animationDuration = (.8 + Math.random()*2) + 's';
+    el.style.animationDelay   = (Math.random()*1.2) + 's';
+    document.body.appendChild(el);
+    el.addEventListener('animationend', () => el.remove());
+  }
+}
+</script>
+</body>
+</html>
