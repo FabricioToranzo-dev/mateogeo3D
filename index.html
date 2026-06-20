@@ -134,6 +134,21 @@
     backdrop-filter: blur(8px);
     transition: transform .25s, border-color .25s;
   }
+
+   .card,
+   .card:link,
+   .card:visited,
+   .card:hover,
+   .card:active {
+    color: inherit;
+    text-decoration: none;
+  }
+
+  .card h3 {
+  color: #ffffff;
+  }
+
+  
   .card:hover { transform: translateY(-3px); border-color: rgba(0,212,255,.5); }
 
   /* ── STEPS ── */
@@ -533,7 +548,6 @@
 
   <!-- ═══ HERO ═══ -->
   <section class="hero">
-    <div class="hero-badge">🎓 Proyecto Educativo Interactivo</div>
     <h1>MateGeo 3D</h1>
     <p class="hero-sub">Explorá prismas, pirámides y cuerpos de revolución como nunca antes — ¡en 3D y Realidad Aumentada!</p>
 
